@@ -173,7 +173,7 @@ func (impl *GrafanaClientImpl) GetAllDatasource() ([]*GetPrometheusDatasourceRes
 		}
 		impl.config.DestinationURL = hostUrl.Value
 	}
-	url := strings.ReplaceAll(impl.config.DestinationURL, "//", "//%s:%s") + GetPromDatasource
+	url := strings.ReplaceAll(impl.config.DestinationURL, "//", "//%s:%s") + PromDatasource
 	url = fmt.Sprintf(url, impl.config.GrafanaUsername, impl.config.GrafanaPassword)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

@@ -228,7 +228,7 @@ func (impl *EventRESTClientImpl) WriteEvent(event Event) (bool, error) {
 }
 
 func (impl *EventRESTClientImpl) SendEvent(event Event) (bool, error) {
-	impl.logger.Debugw("event before send", "event", event)
+	impl.logger.Infow("event before send", "event", event)
 	body, err := json.Marshal(event)
 	if err != nil {
 		impl.logger.Errorw("error while marshaling event request ", "err", err)

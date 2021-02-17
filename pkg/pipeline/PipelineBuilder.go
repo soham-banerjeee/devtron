@@ -35,6 +35,7 @@ import (
 	"github.com/devtron-labs/devtron/internal/sql/repository/security"
 	"github.com/devtron-labs/devtron/internal/util"
 	"github.com/devtron-labs/devtron/pkg/app"
+	"github.com/devtron-labs/devtron/pkg/attributes"
 	"github.com/devtron-labs/devtron/pkg/bean"
 	"github.com/go-pg/pg"
 	"github.com/juju/errors"
@@ -117,6 +118,7 @@ type PipelineBuilderImpl struct {
 	imageScanResultRepository     security.ImageScanResultRepository
 	GitFactory                    *util.GitFactory
 	ArgoK8sClient                 argocdServer.ArgoK8sClient
+	attributesService             attributes.AttributesService
 }
 
 func NewPipelineBuilderImpl(logger *zap.SugaredLogger,
@@ -142,7 +144,7 @@ func NewPipelineBuilderImpl(logger *zap.SugaredLogger,
 	appService app.AppService,
 	imageScanResultRepository security.ImageScanResultRepository,
 	ArgoK8sClient argocdServer.ArgoK8sClient,
-	GitFactory *util.GitFactory,
+	GitFactory *util.GitFactory, attributesService attributes.AttributesService,
 ) *PipelineBuilderImpl {
 	return &PipelineBuilderImpl{
 		logger:                        logger,
@@ -169,6 +171,7 @@ func NewPipelineBuilderImpl(logger *zap.SugaredLogger,
 		imageScanResultRepository:     imageScanResultRepository,
 		ArgoK8sClient:                 ArgoK8sClient,
 		GitFactory:                    GitFactory,
+		attributesService:             attributesService,
 	}
 }
 
@@ -334,8 +337,20 @@ func (impl PipelineBuilderImpl) GetCiPipeline(appId int) (ciConfig *bean.CiConfi
 		impl.logger.Errorw("error in fetching ci pipeline", "appId", appId, "err", err)
 		return nil, err
 	}
-	var ciPipelineResp []*bean.CiPipeline
 
+	if len(impl.ciConfig.ExternalCiWebhookUrl) == 0 {
+		hostUrl, err := impl.attributesService.GetByKey(attributes.HostUrlKey)
+		if err != nil {
+			return nil, err
+		}
+		if hostUrl == nil {
+			impl.logger.Errorw("there is no external ci webhook url configured", "appId", appId)
+			return nil, fmt.Errorf("there is no hosturl found in db or env variable")
+		}
+		impl.ciConfig.ExternalCiWebhookUrl = fmt.Sprintf("%s/orchestrator/webhook/ext-ci", hostUrl.Value)
+	}
+
+	var ciPipelineResp []*bean.CiPipeline
 	for _, pipeline := range pipelines {
 
 		dockerArgs := make(map[string]string)
@@ -1952,6 +1967,19 @@ func (impl PipelineBuilderImpl) GetCiPipelineById(pipelineId int) (ciPipeline *b
 		if err != nil {
 			impl.logger.Warnw("error in unmarshal", "err", err)
 		}
+	}
+
+	if len(impl.ciConfig.ExternalCiWebhookUrl) == 0 {
+		hostUrl, err := impl.attributesService.GetByKey(attributes.HostUrlKey)
+		if err != nil {
+			impl.logger.Errorw("there is no external ci webhook url configured", "ci pipeline", pipeline)
+			return nil, err
+		}
+		if hostUrl == nil {
+			impl.logger.Errorw("there is no external ci webhook url configured", "ci pipeline", pipeline)
+			return nil, fmt.Errorf("there is no hosturl found in db or env variable")
+		}
+		impl.ciConfig.ExternalCiWebhookUrl = fmt.Sprintf("%s/orchestrator/webhook/ext-ci", hostUrl.Value)
 	}
 
 	var externalCiConfig bean.ExternalCiConfig
